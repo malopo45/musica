@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Reproductor Libre</title>
+  <style>
+    :root {
+      --bg: #121212;
+      --card-bg: #1e1e1e;
+      --primary: #1db954;
+      --primary-active: #1ed760;
+      --text: #ffffff;
+      --text-muted: #b3b3b3;
+      --border: #333333;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 150px; }
+
+    header {
+      background: #000;
+      padding: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 1rem; }
+
+    /* Clave API */
+    .config-box {
+      background: #2a2a2a;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .config-box input {
+      flex: 1;
+      padding: 0.5rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: #111;
+      color: #fff;
+    }
+
+    /* Pestañas y Filtros */
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tab-btn {
+      flex: 1;
+      padding: 0.75rem;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .tab-btn.active { background: var(--primary); color: #000; border-color: var(--primary); }
+
+    .genres-bar {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .genre-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .genre-pill:hover { background: #333; }
+
+    /* Lista de canciones */
+    .track-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .track-card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .track-card.playing {
+      border: 1px solid var(--primary);
+      background: #252e27;
+    }
+    .track-card img { width: 50px; height: 50px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+    .track-info { flex: 1; min-width: 0; }
+    .track-title { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .track-artist { font-size: 0.8rem; color: var(--text-muted); }
+
+    /* Botones */
+    .btn {
+      background: var(--primary);
+      border: none;
+      color: #000;
+      padding: 0.5rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .btn-secondary { background: #333; color: #fff; }
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .btn-icon.active {
+      background: var(--primary);
+      color: #000;
+      border-color: var(--primary);
+    }
+
+    /* REPRODUCTOR FIJO INFERIOR */
+    .player-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #181818;
+      border-top: 1px solid var(--border);
+      padding: 0.6rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      z-index: 20;
+    }
+    .player-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .current-track-info {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex: 1;
+      min-width: 0;
+    }
+    .current-track-info img { width: 42px; height: 42px; border-radius: 4px; object-fit: cover; }
+    
+    .player-tools {
+      display: flex;
+      gap: 0.3rem;
+      align-items: center;
+    }
+
+    .audio-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+    }
+    audio { flex: 1; height: 32px; outline: none; }
+
+    /* Menú flotante temporizador */
+    .timer-menu {
+      position: absolute;
+      bottom: 100%;
+      right: 1rem;
+      background: #252525;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem;
+      display: none;
+      flex-direction: column;
+      gap: 0.3rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .timer-menu button {
+      background: transparent;
+      border: none;
+      color: #fff;
+      padding: 0.4rem 0.8rem;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .timer-menu button:hover { background: #333; }
+
+    .playlist-controls { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .playlist-controls input { flex: 1; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border); background: #1e1e1e; color: #fff; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container" style="padding:0;">
+      <h2>🎵 Mi Reproductor</h2>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="config-box">
+      <label for="clientIdInput" style="font-size: 0.85rem;">Client ID Jamendo:</label>
+      <input type="text" id="clientIdInput" placeholder="Pega tu Client ID">
+      <button class="btn" onclick="saveClientId()">Guardar</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tabExplorar" onclick="showTab('explorar')">Explorar Géneros</button>
+      <button class="tab-btn" id="tabListas" onclick="showTab('listas')">Mis Listas</button>
+    </div>
+
+    <!-- SECCIÓN EXPLORAR -->
+    <div id="sectionExplorar">
+      <div class="genres-bar">
+        <button class="genre-pill" onclick="searchByGenre('jazz')">🎷 Jazz</button>
+        <button class="genre-pill" onclick="searchByGenre('rock')">🎸 Rock</button>
+        <button class="genre-pill" onclick="searchByGenre('classical')">🎻 Clásica</button>
+        <button class="genre-pill" onclick="searchByGenre('electronic')">⚡ Electrónica</button>
+        <button class="genre-pill" onclick="searchByGenre('ambient')">🌿 Ambient</button>
+        <button class="genre-pill" onclick="searchByGenre('lofi')">☕ Lo-Fi</button>
+        <button class="genre-pill" onclick="searchByGenre('soundtrack')">🎬 Bandas sonoras</button>
+      </div>
+
+      <div id="resultsList" class="track-list">
+        <p style="color: var(--text-muted);">Selecciona un género para cargar música...</p>
+      </div>
+    </div>
+
+    <!-- SECCIÓN LISTAS -->
+    <div id="sectionListas" style="display: none;">
+      <div class="playlist-controls">
+        <input type="text" id="newPlaylistInput" placeholder="Nombre de la nueva lista...">
+        <button class="btn" onclick="createNewPlaylist()">Crear Lista</button>
+      </div>
+      <div id="playlistsContainer"></div>
+    </div>
+  </main>
+
+  <!-- BARRA DE REPRODUCCIÓN -->
+  <footer class="player-bar">
+    <!-- Menú desplegable Sleep Timer -->
+    <div class="timer-menu" id="timerMenu">
+      <button onclick="setSleepTimer(0)">Apagar temporizador</button>
+      <button onclick="setSleepTimer(15)">15 minutos</button>
+      <button onclick="setSleepTimer(30)">30 minutos</button>
+      <button onclick="setSleepTimer(45)">45 minutos</button>
+      <button onclick="setSleepTimer(60)">60 minutos</button>
+    </div>
+
+    <div class="player-top-row">
+      <div class="current-track-info" id="nowPlaying">
+        <img id="playerCover" src="https://via.placeholder.com/45" alt="Portada">
+        <div class="track-info">
+          <div class="track-title" id="playerTitle">Sin reproducción</div>
+          <div class="track-artist" id="playerArtist">-</div>
+        </div>
+      </div>
+
+      <!-- HERRAMIENTAS: Shuffle, Loop, Sleep Timer -->
+      <div class="player-tools">
+        <button class="btn-icon" id="btnShuffle" title="Modo Aleatorio" onclick="toggleShuffle()">🔀</button>
+        <button class="btn-icon" id="btnRepeat" title="Repetir" onclick="toggleRepeat()">🔁</button>
+        <button class="btn-icon" id="btnTimer" title="Temporizador de apagado" onclick="toggleTimerMenu()">⏱️</button>
+      </div>
+    </div>
+
+    <div class="audio-wrapper">
+      <button class="btn-icon" title="Anterior" onclick="playPrevTrack()">⏮</button>
+      <audio id="audioPlayer" controls></audio>
+      <button class="btn-icon" title="Siguiente" onclick="playNextTrack()">⏭</button>
+    </div>
+  </footer>
+
+  <script>
+    let currentClientId = localStorage.getItem('jamendo_client_id') || '';
+    let currentTracks = [];
+    let playlists = JSON.parse(localStorage.getItem('my_playlists')) || { "Favoritos": [] };
+
+    // Estados de reproducción
+    let activeQueue = [];         // Cola activa de canciones
+    let currentTrackIndex = -1;   // Índice de la canción sonando
+    let isShuffle = false;
+    let repeatMode = 'none';      // 'none' | 'all' | 'one'
+    let sleepTimerTimeout = null;
+    let sleepTimerInterval = null;
+
+    const audioPlayer = document.getElementById('audioPlayer');
+    document.getElementById('clientIdInput').value = currentClientId;
+
+    function saveClientId() {
+      const val = document.getElementById('clientIdInput').value.trim();
+      if (val) {
+        currentClientId = val;
+        localStorage.setItem('jamendo_client_id', val);
+        alert('Client ID guardado correctamente.');
+      }
+    }
+
+    function showTab(tab) {
+      document.getElementById('sectionExplorar').style.display = tab === 'explorar' ? 'block' : 'none';
+      document.getElementById('sectionListas').style.display = tab === 'listas' ? 'block' : 'none';
+      document.getElementById('tabExplorar').classList.toggle('active', tab === 'explorar');
+      document.getElementById('tabListas').classList.toggle('active', tab === 'listas');
+      if (tab === 'listas') renderPlaylists();
+    }
+
+    // Búsqueda de género
+    async function searchByGenre(tag) {
+      if (!currentClientId) {
+        alert('Por favor introduce tu Client ID de Jamendo arriba y pulsa Guardar.');
+        return;
+      }
+      const listEl = document.getElementById('resultsList');
+      listEl.innerHTML = '<p style="color:var(--text-muted)">Cargando canciones...</p>';
+
+      const url = `https://api.jamendo.com/v3.0/tracks/?client_id=${currentClientId}&format=json&limit=25&tags=${tag}&audioformat=mp32`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          currentTracks = data.results;
+          renderTrackList(currentTracks, listEl, 'explore');
+        } else {
+          listEl.innerHTML = '<p>No se encontraron canciones.</p>';
+        }
+      } catch (err) {
+        listEl.innerHTML = '<p style="color:red">Error al conectar con la API de Jamendo.</p>';
+      }
+    }
+
+    // Renderizar tarjetas
+    function renderTrackList(tracks, container, context = 'explore') {
+      container.innerHTML = '';
+      tracks.forEach((track, index) => {
+        const card = document.createElement('div');
+        const isCurrent = activeQueue[currentTrackIndex]?.id === track.id;
+        card.className = `track-card ${isCurrent ? 'playing' : ''}`;
+        card.innerHTML = `
+          <img src="${track.album_image || 'https://via.placeholder.com/50'}" alt="cover">
+          <div class="track-info">
+            <div class="track-title">${track.name}</div>
+            <div class="track-artist">${track.artist_name}</div>
+          </div>
+          <button class="btn" onclick="startPlayback(${index}, '${context}')">▶</button>
+          <button class="btn btn-secondary" onclick="promptAddPlaylist('${track.id}')">＋</button>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Iniciar reproducción desde una lista
+    function startPlayback(index, context) {
+      if (context === 'explore') {
+        activeQueue = [...currentTracks];
+      } else {
+        activeQueue = [...playlists[context]];
+      }
+      currentTrackIndex = index;
+      loadAndPlayCurrent();
+    }
+
+    // Cargar y reproducir la pista activa
+    function loadAndPlayCurrent() {
+      if (currentTrackIndex < 0 || currentTrackIndex >= activeQueue.length) return;
+      const track = activeQueue[currentTrackIndex];
+
+      document.getElementById('playerTitle').textContent = track.name;
+      document.getElementById('playerArtist').textContent = track.artist_name;
+      document.getElementById('playerCover').src = track.album_image || 'https://via.placeholder.com/45';
+      
+      audioPlayer.src = track.audio;
+      audioPlayer.play().catch(e => console.log('Auto-play prevenido:', e));
+
+      // Actualizar Media Session API (Bloqueo y auriculares)
+      updateMediaSession(track);
+    }
+
+    // 1. MEDIA SESSION API (Bloqueo de pantalla y auriculares)
+    function updateMediaSession(track) {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: track.name,
+          artist: track.artist_name,
+          album: 'Jamendo Libre',
+          artwork: [
+            { src: track.album_image || 'https://via.placeholder.com/128', sizes: '128x128', type: 'image/jpeg' },
+            { src: track.album_image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }
+          ]
+        });
+
+        // Asignación de controles físicos y pantalla de bloqueo
+        navigator.mediaSession.setActionHandler('play', () => audioPlayer.play());
+        navigator.mediaSession.setActionHandler('pause', () => audioPlayer.pause());
+        navigator.mediaSession.setActionHandler('previoustrack', () => playPrevTrack());
+        navigator.mediaSession.setActionHandler('nexttrack', () => playNextTrack());
+      }
+    }
+
+    // 2. REPRODUCCIÓN CONTINUA / SIGUIENTE AUTOMÁTICA
+    audioPlayer.addEventListener('ended', () => {
+      if (repeatMode === 'one') {
+        audioPlayer.currentTime = 0;
+        audioPlayer.play();
+      } else {
+        playNextTrack(true); // true indica que viene de auto-finalización
+      }
+    });
+
+    // Control Siguiente
+    function playNextTrack(isAutoEnded = false) {
+      if (activeQueue.length === 0) return;
+
+      if (isShuffle) {
+        let randIndex = Math.floor(Math.random() * activeQueue.length);
+        if (activeQueue.length > 1 && randIndex === currentTrackIndex) {
+          randIndex = (randIndex + 1) % activeQueue.length;
+        }
+        currentTrackIndex = randIndex;
+      } else {
+        currentTrackIndex++;
+        if (currentTrackIndex >= activeQueue.length) {
+          if (repeatMode === 'all') {
+            currentTrackIndex = 0;
+          } else {
+            currentTrackIndex = -1;
+            return; // Fin de la lista
+          }
+        }
+      }
+      loadAndPlayCurrent();
+    }
+
+    // Control Anterior
+    function playPrevTrack() {
+      if (activeQueue.length === 0) return;
+
+      // Si lleva más de 3 segundos sonando, vuelve al principio de la misma
+      if (audioPlayer.currentTime > 3) {
+        audioPlayer.currentTime = 0;
+        return;
+      }
+
+      currentTrackIndex--;
+      if (currentTrackIndex < 0) {
+        currentTrackIndex = repeatMode === 'all' ? activeQueue.length - 1 : 0;
+      }
+      loadAndPlayCurrent();
+    }
+
+    // 3. SHUFFLE Y LOOP
+    function toggleShuffle() {
+      isShuffle = !isShuffle;
+      document.getElementById('btnShuffle').classList.toggle('active', isShuffle);
+    }
+
+    function toggleRepeat() {
+      const btn = document.getElementById('btnRepeat');
+      if (repeatMode === 'none') {
+        repeatMode = 'all';
+        btn.classList.add('active');
+        btn.textContent = '🔁';
+        btn.title = "Repetir toda la lista";
+      } else if (repeatMode === 'all') {
+        repeatMode = 'one';
+        btn.classList.add('active');
+        btn.textContent = '🔂';
+        btn.title = "Repetir esta pista";
+      } else {
+        repeatMode = 'none';
+        btn.classList.remove('active');
+        btn.textContent = '🔁';
+        btn.title = "Repetición apagada";
+      }
+    }
+
+    // 4. TEMPORIZADOR DE APAGADO (SLEEP TIMER)
+    function toggleTimerMenu() {
+      const menu = document.getElementById('timerMenu');
+      menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    function setSleepTimer(minutes) {
+      clearTimeout(sleepTimerTimeout);
+      clearInterval(sleepTimerInterval);
+      const btnTimer = document.getElementById('btnTimer');
+      document.getElementById('timerMenu').style.display = 'none';
+
+      if (minutes === 0) {
+        btnTimer.textContent = '⏱️';
+        btnTimer.classList.remove('active');
+        return;
+      }
+
+      let remainingSec = minutes * 60;
+      btnTimer.classList.add('active');
+
+      const updateLabel = () => {
+        const m = Math.floor(remainingSec / 60);
+        const s = remainingSec % 60;
+        btnTimer.textContent = `⏱️ ${m}:${s < 10 ? '0' : ''}${s}`;
+      };
+
+      updateLabel();
+
+      sleepTimerInterval = setInterval(() => {
+        remainingSec--;
+        if (remainingSec <= 0) {
+          clearInterval(sleepTimerInterval);
+          audioPlayer.pause();
+          btnTimer.textContent = '⏱️';
+          btnTimer.classList.remove('active');
+        } else {
+          updateLabel();
+        }
+      }, 1000);
+    }
+
+    // Gestión de listas
+    function createNewPlaylist() {
+      const name = document.getElementById('newPlaylistInput').value.trim();
+      if (!name) return;
+      if (!playlists[name]) {
+        playlists[name] = [];
+        savePlaylists();
+        document.getElementById('newPlaylistInput').value = '';
+        renderPlaylists();
+      } else {
+        alert('Esa lista ya existe.');
+      }
+    }
+
+    function promptAddPlaylist(trackId) {
+      const allTracks = [...currentTracks, ...Object.values(playlists).flat()];
+      const track = allTracks.find(t => t.id === trackId);
+      if (!track) return;
+
+      const playlistNames = Object.keys(playlists);
+      if (playlistNames.length === 0) {
+        alert('Crea primero una lista en la pestaña "Mis Listas".');
+        return;
+      }
+
+      const choice = prompt(`¿A qué lista añadir "${track.name}"?\n${playlistNames.join('\n')}`);
+      if (choice && playlists[choice]) {
+        if (!playlists[choice].some(t => t.id === track.id)) {
+          playlists[choice].push(track);
+          savePlaylists();
+          alert(`Añadida a "${choice}"`);
+        } else {
+          alert('La canción ya está en esa lista.');
+        }
+      }
+    }
+
+    function renderPlaylists() {
+      const container = document.getElementById('playlistsContainer');
+      container.innerHTML = '';
+
+      for (const [name, tracks] of Object.entries(playlists)) {
+        const box = document.createElement('div');
+        box.style.marginBottom = '1.5rem';
+        box.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+            <h3>📁 ${name} (${tracks.length})</h3>
+            <button class="btn btn-secondary" style="font-size:0.75rem;" onclick="deletePlaylist('${name}')">Eliminar</button>
+          </div>
+          <div class="track-list" id="pl-${name}"></div>
+        `;
+        container.appendChild(box);
+
+        const listEl = box.querySelector(`#pl-${name}`);
+        if (tracks.length === 0) {
+          listEl.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">Lista vacía.</p>';
+        } else {
+          renderTrackList(tracks, listEl, name);
+        }
+      }
+    }
+
+    function deletePlaylist(name) {
+      if (confirm(`¿Eliminar la lista "${name}"?`)) {
+        delete playlists[name];
+        savePlaylists();
+        renderPlaylists();
+      }
+    }
+
+    function savePlaylists() {
+      localStorage.setItem('my_playlists', JSON.stringify(playlists));
+    }
+  </script>
+</body>
+</html>
